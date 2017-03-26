@@ -1,3 +1,12 @@
+/**
+  Processing部で共用するライブラリclass
+  2017/03/26  tatsu.
+  
+  > PbPoint       XY点のクラス。XYベクトル計算も可。
+  > PbRect        2次元四角形のクラス。点との内外判定も。
+  > PbTimeFrame   時間枠。
+  > PbScene       経過時間により再生シーンを変更する管理クラス。
+*/
 
 /**
   XY点クラス
@@ -22,7 +31,7 @@ class PbPoint {
   }
 
   void setRandom( float _sx, float _sy, float _ex, float _ey  )
-  { //<>//
+  {
     _X = random( _sx, _ex );
     _Y = random( _sy, _ey );
   }
@@ -95,7 +104,21 @@ class PbPoint {
 
   PbPoint Add( float _x, float _y )
   {
+    AddX( _x );
+    AddY( _y );
+
+    return this;
+  }
+
+  PbPoint AddX( float _x )
+  {
     _X += _x;
+
+    return this;
+  }
+
+  PbPoint AddY( float _y )
+  {
     _Y += _y;
 
     return this;
@@ -178,12 +201,23 @@ class PbMovePoint extends PbPoint
   PbPoint getStep()             { return new PbPoint( _Step ); }
   void    setStep( PbPoint _s ) { _Step = new PbPoint( _s ); }
 
+  void setRandom(
+    float  _pos_x,
+    float  _pos_y,
+    float  _vec_s,
+    float  _vec_e
+  )
+  {
+    this.setRandom( _pos_x, _pos_y );
+    _Step.setRandom( _vec_s, _vec_e );
+  }
+
   /**
     コンストラクタ
-    XYを0クリア、移動量は（1,0）で初期化する
   */
   PbMovePoint()
   {
+    // XYを0クリア、移動量は（1,0）で初期化する
     super();
     _Step = new PbPoint( 1, 1 );
   }
@@ -199,8 +233,18 @@ class PbMovePoint extends PbPoint
     {
       PbPoint  over_xy = _rect.getOverFloat( this );
 
-      
+      // はみ出した量の逆符号にして加算する。移動量も符号を反転する。
+      if( over_xy.getX() != 0.0 )
+      {
+        this.AddX( -over_xy.getX() );
+        _Step.setX( -_Step.getX() );
+      }
 
+      if( over_xy.getY() != 0.0 )
+      {
+        this.AddY( -over_xy.getY() );
+        _Step.setY( -_Step.getY() );
+      }
     }
   }
 
@@ -223,10 +267,20 @@ class PbRect
   
   PbRect( PbPoint _sp, PbPoint _ep )
   {
-    float  sp_x = ( _sp.getX() < _ep.getX() ) ? _sp.getX(): _ep.getX();
-    float  sp_y = ( _sp.getY() < _ep.getY() ) ? _sp.getY(): _ep.getY();
-    float  ep_x = ( _sp.getX() >= _ep.getX() ) ? _sp.getX(): _ep.getX();
-    float  ep_y = ( _sp.getY() >= _ep.getY() ) ? _sp.getY(): _ep.getY();
+    setRect( _sp.getX(), _sp.getY(), _ep.getX(), _ep.getY() );    
+  }
+
+  PbRect( float _spx, float _spy, float _epx, float _epy )
+  {
+    setRect( _spx, _spy, _epx, _epy );    
+  }
+  
+  void setRect( float _spx, float _spy, float _epx, float _epy )
+  {
+    float  sp_x = ( _spx <  _epx ) ? _spx: _epx;
+    float  sp_y = ( _spy <  _epy ) ? _spy: _epy;
+    float  ep_x = ( _spx >= _epx ) ? _spx: _epx;
+    float  ep_y = ( _spy >= _epy ) ? _spy: _epy;
     
     // 始点-終点 で四角形を表す。
     _Sp = new PbPoint( sp_x, sp_y );
@@ -244,7 +298,7 @@ class PbRect
     float  x = _pos.getX();
 
     if( _Sp.getX() > x ||
-        _Ep.getX() < x ) {
+        _Ep.getX() < x )
     {
       return true;
     }
@@ -293,10 +347,10 @@ class PbRect
 }
 
 /**
-  シーン抽象クラス
+  時間枠
 */
-abstract class PbScene {
-
+class PbTimeFrame
+{
   /**
     シーンの開始終了時間を設定する。millis() の時間で設定する。
     再生は _Start ≦ time ＜ _EndTime が担当時間とする。
@@ -314,9 +368,59 @@ abstract class PbScene {
   /**
     コンストラクタ
   */
+  PbTimeFrame()
+  {
+    _StartTime = _EndTime = 0;
+  }
+
+  /**
+    コンストラクタ
+  */
+  PbTimeFrame( int _s, int _e )
+  {
+    _StartTime = _s;
+    _EndTime   = _e;
+  }
+
+  /**
+    シーンの再生時間であれば true を返す。
+  */
+  public boolean isPlayTime( int _time )
+  {
+    return ( (_StartTime <= _time) && (_time < _EndTime) );
+  }
+
+  /**
+    シーンの〜％経過したかを返す。
+  */
+  public float elapsedTimeRate( int _time )
+  {
+    float all_time = _EndTime - _StartTime;
+    float now_time = _EndTime - _time;
+
+//  println( all_time + ":" + now_time );
+
+    float rate = 1.0 - now_time / all_time;
+
+    return rate;
+  }
+}
+
+/**
+  シーン抽象クラス
+*/
+abstract class PbScene
+{
+  PbTimeFrame  _Tf;
+  
+  /**
+    コンストラクタ
+  */
   PbScene( int _s, int _e )
   {
-    setTime( _s, _e );
+    _Tf = new PbTimeFrame(); 
+    
+    _Tf.setTime( _s, _e );
 
     // 初期化処理
     init();
@@ -337,7 +441,7 @@ abstract class PbScene {
   */
   public boolean isPlaytime( int _time )
   {
-    return ( (_StartTime <= _time) && (_time < _EndTime) );
+    return _Tf.isPlayTime( _time );
   }
 
   /**
@@ -345,13 +449,6 @@ abstract class PbScene {
   */
   public float elapsedTimeRate( int _time )
   {
-    float all_time = _EndTime - _StartTime;
-    float now_time = _EndTime - _time;
-
-//  println( all_time + ":" + now_time );
-
-    float rate = 1.0 - now_time / all_time;
-
-    return rate;
+    return _Tf.elapsedTimeRate( _time );
   }
 }
