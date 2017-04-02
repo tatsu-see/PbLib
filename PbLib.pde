@@ -4,6 +4,7 @@
   
   > PbPoint       XY点のクラス。XYベクトル計算も可。
   > PbRect        2次元四角形のクラス。点との内外判定も。
+  > PbCircle      2次元円のクラス。3点円など。
   > PbTimeFrame   時間枠。
   > PbScene       経過時間により再生シーンを変更する管理クラス。
 */
@@ -201,7 +202,20 @@ class PbMovePoint extends PbPoint
   PbPoint getStep()             { return new PbPoint( _Step ); }
   void    setStep( PbPoint _s ) { _Step = new PbPoint( _s ); }
 
-  void setRandom(
+  /**
+    コンストラクタ
+  */
+  PbMovePoint()
+  {
+    // XYを0クリア、移動量は（1,1）で初期化する
+    super();
+    _Step = new PbPoint( 1, 1 );
+  }
+
+  // is
+  
+  // get/set
+    void setRandom(
     float  _pos_x,
     float  _pos_y,
     float  _vec_s,
@@ -212,14 +226,14 @@ class PbMovePoint extends PbPoint
     _Step.setRandom( _vec_s, _vec_e );
   }
 
+  // update
+
   /**
-    コンストラクタ
+    座標を移動する。
   */
-  PbMovePoint()
+  void MoveStep()
   {
-    // XYを0クリア、移動量は（1,0）で初期化する
-    super();
-    _Step = new PbPoint( 1, 1 );
+    this.Add( _Step );
   }
 
   /**
@@ -229,9 +243,9 @@ class PbMovePoint extends PbPoint
   {
     this.Add( _Step );
 
-    if( _rect.IsOut( this ) )
+    if( _rect.isOut( this ) )
     {
-      PbPoint  over_xy = _rect.getOverFloat( this );
+      PbPoint  over_xy = _rect.getOverAmount( this );
 
       // はみ出した量の逆符号にして加算する。移動量も符号を反転する。
       if( over_xy.getX() != 0.0 )
@@ -249,12 +263,31 @@ class PbMovePoint extends PbPoint
   }
 
   /**
-    座標を移動する。
+    四角の内側で座標を移動する。
   */
-  void MoveStep()
+  void MoveStepOutRect( PbRect _rect )
   {
     this.Add( _Step );
+
+    if( _rect.isIn( this ) )
+    {
+      PbPoint  over_xy = _rect.getBiteAmount( this );
+
+      // はみ出した量の逆符号にして加算する。移動量も符号を反転する。
+      if( over_xy.getX() != 0.0 )
+      {
+        this.AddX( -over_xy.getX() );
+        _Step.setX( -_Step.getX() );
+      }
+
+      if( over_xy.getY() != 0.0 )
+      {
+        this.AddY( -over_xy.getY() );
+        _Step.setY( -_Step.getY() );
+      }
+    }
   }
+
 }
 
 /**
@@ -262,9 +295,14 @@ class PbMovePoint extends PbPoint
 */
 class PbRect
 {
-  PbPoint  _Sp;
-  PbPoint  _Ep;
+  PbPoint  _Sp;  // 小さい座標
+  PbPoint  _Ep;  // 大きい座標
+
+  // getter/setter
+  PbPoint  getSp() { return _Sp;  }
+  PbPoint  getEp() { return _Ep;  }
   
+  // constractor
   PbRect( PbPoint _sp, PbPoint _ep )
   {
     setRect( _sp.getX(), _sp.getY(), _ep.getX(), _ep.getY() );    
@@ -275,24 +313,19 @@ class PbRect
     setRect( _spx, _spy, _epx, _epy );    
   }
   
-  void setRect( float _spx, float _spy, float _epx, float _epy )
+  PbRect( PbPoint _pos )
   {
-    float  sp_x = ( _spx <  _epx ) ? _spx: _epx;
-    float  sp_y = ( _spy <  _epy ) ? _spy: _epy;
-    float  ep_x = ( _spx >= _epx ) ? _spx: _epx;
-    float  ep_y = ( _spy >= _epy ) ? _spy: _epy;
-    
-    // 始点-終点 で四角形を表す。
-    _Sp = new PbPoint( sp_x, sp_y );
-    _Ep = new PbPoint( ep_x, ep_y );
+    setRect( _pos.getX(), _pos.getY(), _pos.getX(), _pos.getY() );    
   }
-  
+
+  // -is-
+
   /**
     四角の外に出ているか調べる。
     境界は出ていないと判断する。
   */
-  boolean  IsOut(
-    PbPoint  _pos
+  boolean  isOut(
+    PbPoint  _pos  // I:点
   )
   {
     float  x = _pos.getX();
@@ -315,9 +348,56 @@ class PbRect
   }
   
   /**
+    四角の内側の入っているかを調べる。
+    境界は入っていると判断する。
+  */
+  boolean  isIn(
+    PbPoint  _pos  // I:点
+  )
+  {
+    boolean b = isOut( _pos );
+    
+    return !b;
+  }
+  
+  // get/set
+  void setRect( float _spx, float _spy, float _epx, float _epy )
+  {
+    float  sp_x = ( _spx <  _epx ) ? _spx: _epx;
+    float  sp_y = ( _spy <  _epy ) ? _spy: _epy;
+    float  ep_x = ( _spx >= _epx ) ? _spx: _epx;
+    float  ep_y = ( _spy >= _epy ) ? _spy: _epy;
+    
+    // 始点-終点 で四角形を表す。
+    _Sp = new PbPoint( sp_x, sp_y );
+    _Ep = new PbPoint( ep_x, ep_y );
+  }
+
+  float  getW()
+  {
+    return ( _Ep.getX() - _Sp.getX() );
+  }
+  
+  float  getH()
+  {
+    return ( _Ep.getY() - _Sp.getY() );
+  }
+  
+  /**
+    中心点を取得する。
+  */
+  PbPoint  getCenter()
+  {
+    float  x = (_Sp.getX() + _Ep.getX() ) / 2.0;
+    float  y = (_Sp.getY() + _Ep.getY() ) / 2.0;
+
+    return new PbPoint( x, y );
+  }
+    
+  /**
     外にどれだけ出ているかの量(X,Y)を計算する。
   */
-  PbPoint  getOverFloat( PbPoint _pos )
+  PbPoint  getOverAmount( PbPoint _pos )
   {
     // X方向の量を計算する。
     float  pos_x = _pos.getX();
@@ -343,7 +423,74 @@ class PbRect
 
     // ベクトルにして返す。
     return new PbPoint( over_x, over_y );
-  }  
+  }
+
+  /**
+    内にどれだけ食い込んでいるか量(X,Y)を計算する。
+  */
+  PbPoint  getBiteAmount( PbPoint _pos )
+  {
+    // X方向の量を計算する。
+    float  pos_x = _pos.getX();
+    float  bite_x = 0.0;
+    
+    if( ( _Sp.getX() < pos_x ) && ( pos_x < _Ep.getX() ) )
+    {
+      float bite_sx = pos_x - _Sp.getX();
+      float bite_ex = pos_x - _Ep.getX();
+
+      // 食い込みが浅い方を選択する。
+      bite_x = (abs( bite_sx ) < abs( bite_ex )) ? bite_sx: bite_ex;
+    }
+
+    // Y方向の量を計算する。
+    float  pos_y = _pos.getY();
+    float  bite_y = 0.0;
+    
+    if( ( _Sp.getY() < pos_y ) && ( pos_y < _Ep.getY() ) )
+    {
+      float bite_sy = pos_y - _Sp.getY();
+      float bite_ey = pos_y - _Ep.getY();
+
+      // 食い込みが浅い方を選択する。
+      bite_y = (abs( bite_sy ) < abs( bite_ey )) ? bite_sy: bite_ey;
+    }
+
+    // ベクトルにして返す。
+    PbPoint  ret;
+    if( abs( bite_x ) < abs( bite_y ) ) {
+      ret = new PbPoint( bite_x, 0.0 );
+    }
+    else if( abs( bite_x ) > abs( bite_y ) ) {
+      ret = new PbPoint( 0.0, bite_y );
+    }
+    else {
+      ret = new PbPoint( bite_x, bite_y );
+    }
+    
+    return ret;
+  }
+
+  // update
+  
+  /**
+    四角形を大きくする。
+  */
+  void  inflate( float _x, float _y )
+  {
+    _Sp.setX( _Sp.getX() - _x );
+    _Sp.setY( _Sp.getY() - _y );
+    _Ep.setX( _Ep.getX() + _x );
+    _Ep.setY( _Ep.getY() + _y );
+  }
+}
+
+/**
+  円のクラス。
+*/
+class PbCirle
+{
+  ;
 }
 
 /**
