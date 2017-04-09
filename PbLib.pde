@@ -2,9 +2,12 @@
   Processing部で共用するライブラリclass
   2017/03/26  tatsu.
   
-  > PbPoint       XY点のクラス。XYベクトル計算も可。
+  > PbPoint       XY点のクラス。XYベクトル計算も可。点の色透明度も。
   > PbRect        2次元四角形のクラス。点との内外判定も。
+  > PbLine        2次元直線のクラス。
   > PbCircle      2次元円のクラス。3点円など。
+
+  > PbColor       色と透明度
   > PbTimeFrame   時間枠。
   > PbScene       経過時間により再生シーンを変更する管理クラス。
 */
@@ -16,11 +19,11 @@ class PbPoint {
 
   float  _X;
   float  _Y;
-
+  
   // getter/setter
   float getX() { return _X; }
   float getY() { return _Y; }
-
+  
   void setX( float _x ) { _X = _x; }
   void setY( float _y ) { _Y = _y; }
   void setXY( float _x, float _y ) { _X = _x; _Y = _y; }
@@ -78,18 +81,18 @@ class PbPoint {
   */
   float  getLength()
   {
-    return Dist( 0.0, 0.0 );
+    return getDist( 0.0, 0.0 );
   }
 
   /**
     指定点との距離を測る
   */
-  float  Dist( PbPoint _pos )
+  float  getDist( PbPoint _pos )
   {
-    return Dist( _pos.getX(), _pos.getY() );
+    return getDist( _pos.getX(), _pos.getY() );
   }
 
-  float  Dist( float _x, float _y )
+  float  getDist( float _x, float _y )
   {
     return dist( _x, _y, this.getX(), this.getY() );
   }
@@ -98,27 +101,27 @@ class PbPoint {
 /**
 		位置ベクトルにベクトルを加算する。
   */
-  PbPoint Add( PbPoint _vec )
+  PbPoint add( PbPoint _vec )
   {
-    return Add( _vec.getX(), _vec.getY() );
+    return add( _vec.getX(), _vec.getY() );
   }
 
-  PbPoint Add( float _x, float _y )
+  PbPoint add( float _x, float _y )
   {
-    AddX( _x );
-    AddY( _y );
+    addX( _x );
+    addY( _y );
 
     return this;
   }
 
-  PbPoint AddX( float _x )
+  PbPoint addX( float _x )
   {
     _X += _x;
 
     return this;
   }
 
-  PbPoint AddY( float _y )
+  PbPoint addY( float _y )
   {
     _Y += _y;
 
@@ -128,12 +131,12 @@ class PbPoint {
   /**
     位置ベクトルにベクトルを減算する。
   */
-  PbPoint Sub( PbPoint _vec )
+  PbPoint sub( PbPoint _vec )
   {
-    return Sub( _vec.getX(), _vec.getY() );
+    return sub( _vec.getX(), _vec.getY() );
   }
 
-  PbPoint Sub( float _x, float _y )
+  PbPoint sub( float _x, float _y )
   {
     _X -= _x;
     _Y -= _y;
@@ -144,7 +147,7 @@ class PbPoint {
   /**
     位置ベクトルを乗算する。
   */
-  PbPoint Mul( float _m )
+  PbPoint mul( float _m )
   {
     _X *= _m;
     _Y *= _m;
@@ -155,7 +158,7 @@ class PbPoint {
   /**
     位置ベクトルを除算する。
   */
-  PbPoint Div( float _m )
+  PbPoint div( float _m )
   {
     _X /= _m;
     _Y /= _m;
@@ -166,12 +169,12 @@ class PbPoint {
   /**
     単位ベクトルを得る。
   */
-  PbPoint getUnitvector()
+  PbPoint getUnitVector()
   {
     PbPoint  vec = getVector( 0.0, 0.0 );
     float    len = getLength();
 
-    return   vec.Div( len );
+    return   vec.div( len );
   }
 
   /**
@@ -233,7 +236,7 @@ class PbMovePoint extends PbPoint
   */
   void MoveStep()
   {
-    this.Add( _Step );
+    this.add( _Step );
   }
 
   /**
@@ -241,7 +244,7 @@ class PbMovePoint extends PbPoint
   */
   void MoveStepInRect( PbRect _rect )
   {
-    this.Add( _Step );
+    this.add( _Step );
 
     if( _rect.isOut( this ) )
     {
@@ -250,13 +253,13 @@ class PbMovePoint extends PbPoint
       // はみ出した量の逆符号にして加算する。移動量も符号を反転する。
       if( over_xy.getX() != 0.0 )
       {
-        this.AddX( -over_xy.getX() );
+        this.addX( -over_xy.getX() );
         _Step.setX( -_Step.getX() );
       }
 
       if( over_xy.getY() != 0.0 )
       {
-        this.AddY( -over_xy.getY() );
+        this.addY( -over_xy.getY() );
         _Step.setY( -_Step.getY() );
       }
     }
@@ -267,7 +270,7 @@ class PbMovePoint extends PbPoint
   */
   void MoveStepOutRect( PbRect _rect )
   {
-    this.Add( _Step );
+    this.add( _Step );
 
     if( _rect.isIn( this ) )
     {
@@ -276,13 +279,13 @@ class PbMovePoint extends PbPoint
       // はみ出した量の逆符号にして加算する。移動量も符号を反転する。
       if( over_xy.getX() != 0.0 )
       {
-        this.AddX( -over_xy.getX() );
+        this.addX( -over_xy.getX() );
         _Step.setX( -_Step.getX() );
       }
 
       if( over_xy.getY() != 0.0 )
       {
-        this.AddY( -over_xy.getY() );
+        this.addY( -over_xy.getY() );
         _Step.setY( -_Step.getY() );
       }
     }
@@ -299,8 +302,8 @@ class PbRect
   PbPoint  _Ep;  // 大きい座標
 
   // getter/setter
-  PbPoint  getSp() { return _Sp;  }
-  PbPoint  getEp() { return _Ep;  }
+  PbPoint  getSp() { return new PbPoint(_Sp);  }
+  PbPoint  getEp() { return new PbPoint(_Ep);  }
   
   // constractor
   PbRect( PbPoint _sp, PbPoint _ep )
@@ -486,11 +489,99 @@ class PbRect
 }
 
 /**
+  直線のクラス
+*/
+class PbLine
+{
+  PbPoint  _Sp;  // 始点
+  PbPoint  _Ep;  // 終点
+
+  // getter/setter
+  PbPoint  getSp()              { return new PbPoint(_Sp); }
+  void     setSp( PbPoint _s )  { _Sp = _s;   }
+
+  PbPoint  getEp()              { return new PbPoint(_Ep); }
+  void     setEp( PbPoint _e )  { _Ep = _e;   }
+  
+  PbPoint  getVecSE()
+  {
+    PbPoint  s = new PbPoint( _Sp );
+    PbPoint  e = new PbPoint( _Ep );
+
+    return e.sub( s );
+  }
+  
+  PbPoint  getVecES()
+  {
+    return getVecSE().mul( -1.0 );
+  }
+  
+  // constractor
+  
+  PbLine( PbPoint _s, PbPoint  _e )
+  {
+    _Sp = new PbPoint( _s );
+    _Ep = new PbPoint( _e );
+  }
+
+  // update
+  
+  /**
+    直線を延長する。
+  */
+  void  extend( float  _len )
+  {
+    // 始終点間の単位ベクトルに長さを掛けて加算する。
+    _Ep.add( getVecSE().getUnitVector().mul( _len ) );
+    _Sp.add( getVecES().getUnitVector().mul( _len ) );
+  }
+}
+
+/**
   円のクラス。
 */
-class PbCirle
+class PbCircle
 {
-  ;
+  PbPoint  _Cp;   // 中心点
+  float    _Rad;  // 半径
+
+  // constractor
+  
+  // 3点円弧
+  PbCircle( PbPoint _p1, PbPoint _p2, PbPoint _p3 )
+  {
+    // 2直線の交点として求めたほうが早いかも。
+    // http://examist.jp/mathematics/figure-circle/circle/
+    
+    ;
+  }
+}
+
+/**
+  色のクラス。
+*/
+class PbColor
+{
+  color  _Color;
+  float  _Alpha;
+
+  // getter/setter
+
+  color  getColor()           { return color(_Color); }
+  void   setColor( color _c ) { _Color = color( _c ); }
+
+  float  getAlpha()           { return color(_Alpha); }
+  void   setAlpha( float _a ) { _Alpha = _a; }
+
+  void setRandomColor()
+  {
+    setColor( color( random(255), random(255), random(255) ) );
+  }
+
+  void setRandomAlpha()
+  {
+    setAlpha( random(255) );
+  }
 }
 
 /**
