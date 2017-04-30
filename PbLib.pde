@@ -8,6 +8,8 @@
   > PbCircle      2次元円のクラス。3点円など。
 
   > PbColor       色と透明度
+  > PbGrid        格子状に並んだオブジェクト郡
+  > PbImageGrid   画像を格子状のオブジェクトに分解したもの
   > PbTimeFrame   時間枠。
   > PbScene       経過時間により再生シーンを変更する管理クラス。
 */
@@ -98,7 +100,7 @@ class PbPoint {
   }
 
 
-/**
+  /**
 		位置ベクトルにベクトルを加算する。
   */
   PbPoint add( PbPoint _vec )
@@ -585,6 +587,67 @@ class PbColor
 }
 
 /**
+  格子状のデータ
+*/
+class PbGrid
+{
+  int        _XNum;
+  int        _YNum;
+  PbRect[][] _GridRect;
+  
+  // getter/setter
+  int  getXNum() { return _XNum;  }
+  int  getYNum() { return _YNum;  }
+
+  /**
+    コンストラクタ
+  */
+  PbGrid( int _w, int _h, int _x_num, int _y_num )
+  {
+    _XNum = _x_num;
+    _YNum = _y_num;
+    
+    // 要素数分確保する。
+    _GridRect = new PbRect[_x_num][_y_num];
+
+    int  w_step = _w / _x_num;
+    int  h_step = _h / _y_num;
+     
+    // オブジェクトを配置する。
+    for( int x = 0; x < _x_num; ++x ) {
+      for( int y = 0; y < _y_num; ++y ) {
+         
+        int sx = w_step * x;
+        int ex = w_step * (x+1) -1;
+        int sy = h_step * y;
+        int ey = h_step * (y+1) -1;
+         
+        _GridRect[x][y] = new PbRect( sx, sy, ex, ey );
+      }
+    }
+  }
+}
+
+/**
+  画像を格子状のオブジェクトに分解したもの。
+*/
+class PbImageGrid extends PbGrid
+{
+  PImage  _Image;
+
+  /**
+    コンストラクタ
+  */
+  PbImageGrid( PImage _img, int _w, int _h, int _x, int _y )
+  {
+    super( _w, _h, _x, _y );
+    
+    // 画像をコピーして覚える。
+    PImage _Image = _img.get( 0, 0, _img.width, _img.height );
+  }
+}
+
+/**
   時間枠
 */
 class PbTimeFrame
@@ -642,6 +705,14 @@ class PbTimeFrame
 
     return rate;
   }
+
+  /**
+    再生時間長さ
+  */
+  int  getLength()
+  {
+    return _EndTime - _StartTime;
+  }
 }
 
 /**
@@ -650,6 +721,13 @@ class PbTimeFrame
 abstract class PbScene
 {
   PbTimeFrame  _Tf;
+  int          _Current;
+
+  // getter/setter
+  int   getLength()  { return _Tf.getLength();  }
+  
+  int   getCurrnet()         { return _Current; }
+  void  setCurrent( int _c ) { _Current = _c;   }
   
   /**
     コンストラクタ
@@ -685,8 +763,114 @@ abstract class PbScene
   /**
     シーンの〜％経過したかを返す。
   */
+  public float elapsedTimeRate()
+  {
+    return _Tf.elapsedTimeRate( _Current );
+  }
+
   public float elapsedTimeRate( int _time )
   {
     return _Tf.elapsedTimeRate( _time );
+  }
+}
+
+/**
+  サブシーン抽象クラス
+  （シーンを等間隔で細分化して描画する際に使用するシーンクラス）
+*/
+abstract class PbSubScene extends PbScene
+{
+  ArrayList<PbTimeFrame> _TimeFrames;
+  int                    _TimeStep;
+  
+  /**
+    コンストラクタ
+  */
+  PbSubScene( int _s, int _e, int _div )
+  {
+    super( _s, _e );
+
+    _TimeStep = (_e - _s) / _div;
+    
+    // 分割数分の時間間隔オブジェクトを作る。
+    _TimeFrames = new ArrayList<PbTimeFrame>;
+    
+    for( int i = 0; i < _div; ++i )
+    {
+      int  s = _TimeStep * i;
+      int  e = (_TimeStep * (i+1))-1;
+      
+      _TimeFrames.add( new PbTimeFrame( s, e ) );
+    }
+  }
+  
+  /**
+    描画する。
+  */
+  final void draw()
+  {
+    // 今の進捗率から、サブ描画の進捗率を得る。
+    
+    for( int i = 0; i < _TimeFrames.size(); ++i )
+    {
+      // 経過率を計算する。
+      float  rate = _TimeFrames.get(i).elapsedTimeRate( getCurrnet() );
+
+      if( rate >= 0.0 ) {
+        drawSub( i, rate );
+      }
+    }
+  }
+  
+  /**
+    細分化して描画するときのメンバ
+  */
+  abstract public void drawSub( int _i, float _rate );
+}
+
+/**
+  シーンを管理するオブジェクト
+*/
+class PbScenes extends ArrayList<PbScene>
+{
+  boolean  _LoopPlay;
+  int      _LoopAdjust;
+
+  /**
+    コンストラクタ
+  */
+  PbScenes()
+  {
+    _LoopPlay   = true;
+    _LoopAdjust = 0;
+  }
+  
+  /**
+    再生するシーンを描画する。
+  */
+  void drawScene()
+  {
+    int play_count = 0;
+  
+    int current = millis();
+  
+    // 再生時間に達していたら、そのシーンを再生する。
+    for( int i = 0; i < size(); ++i )
+    {
+      if( get(i).isPlaytime( current - _LoopAdjust ) )
+      {
+        get(i).setCurrent( current - _LoopAdjust );
+        get(i).draw();
+      
+        // 再生シーン数を数える。
+        ++play_count;
+      }
+    }
+    
+    // １シーンもを再生しなかったら、開始終了時間を更新して、また初めから再生する。
+    if( play_count == 0 && _LoopPlay )
+    {
+      _LoopAdjust = current;
+    }
   }
 }
