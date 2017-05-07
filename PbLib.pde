@@ -11,7 +11,10 @@
   > PbGrid        格子状に並んだオブジェクト郡
   > PbImageGrid   画像を格子状のオブジェクトに分解したもの
   > PbTimeFrame   時間枠。
-  > PbScene       経過時間により再生シーンを変更する管理クラス。
+
+  > PbScene       経過時間により再生シーンをシーン毎に変更するためのクラス。
+  > PbSubScene    シーンの中を細分化して描画するためのクラス。
+  > PbScenes      複数のシーンを管理するためのクラス。
 */
 
 /**
@@ -307,7 +310,17 @@ class PbRect
   PbPoint  getSp() { return new PbPoint(_Sp);  }
   PbPoint  getEp() { return new PbPoint(_Ep);  }
   
-  // constractor
+  /**
+    constractor
+  */
+  PbRect( PbRect _rect )
+  {
+    setRect(
+      _rect.getSp().getX(), _rect.getSp().getY(),
+      _rect.getEp().getX(), _rect.getEp().getY()
+    );    
+  }
+
   PbRect( PbPoint _sp, PbPoint _ep )
   {
     setRect( _sp.getX(), _sp.getY(), _ep.getX(), _ep.getY() );    
@@ -626,6 +639,14 @@ class PbGrid
       }
     }
   }
+
+  /**
+    グリッドを１つ取得する
+  */
+  PbRect getGrid( int _x, int _y )
+  {
+    return new PbRect( _GridRect[_x][_y] );
+  }
 }
 
 /**
@@ -643,7 +664,22 @@ class PbImageGrid extends PbGrid
     super( _w, _h, _x, _y );
     
     // 画像をコピーして覚える。
-    PImage _Image = _img.get( 0, 0, _img.width, _img.height );
+    _Image = _img.get( 0, 0, _img.width, _img.height );
+  }
+
+  /**
+    イメージを取得する。
+  */
+  PImage  getImage( PbRect  _rect )
+  {
+    int  x = (int)_rect.getSp().getX();
+    int  y = (int)_rect.getSp().getY();
+    int  w = (int)_rect.getW();
+    int  h = (int)_rect.getH();
+    
+    PImage img = _Image.get( x, y, w, h );
+    
+    return img;
   }
 }
 
@@ -665,6 +701,9 @@ class PbTimeFrame
     _StartTime = _s;
     _EndTime = _e;
   }
+
+  int  getStartTime() { return _StartTime; }
+  int  getEndTime()   { return _EndTime;   }
 
   /**
     コンストラクタ
@@ -696,12 +735,12 @@ class PbTimeFrame
   */
   public float elapsedTimeRate( int _time )
   {
-    float all_time = _EndTime - _StartTime;
-    float now_time = _EndTime - _time;
+    float all_time  = _EndTime - _StartTime;
+    float rest_time = _EndTime - _time;
 
 //  println( all_time + ":" + now_time );
 
-    float rate = 1.0 - now_time / all_time;
+    float rate = 1.0 - rest_time / all_time;
 
     return rate;
   }
@@ -722,12 +761,16 @@ abstract class PbScene
 {
   PbTimeFrame  _Tf;
   int          _Current;
+  boolean      _Finished;
 
   // getter/setter
-  int   getLength()  { return _Tf.getLength();  }
+  int      getLength()  { return _Tf.getLength();  }
   
-  int   getCurrnet()         { return _Current; }
-  void  setCurrent( int _c ) { _Current = _c;   }
+  int      getCurrnet()         { return _Current; }
+  void     setCurrent( int _c ) { _Current = _c;   }
+
+  boolean  getFinished()             { return _Finished; }
+  void     setFinished( boolean _b ) { _Finished = _b;   }
   
   /**
     コンストラクタ
@@ -740,6 +783,9 @@ abstract class PbScene
 
     // 初期化処理
     init();
+    
+    // 最後の処理
+    setFinished( false );
   }
 
   /**
@@ -755,9 +801,17 @@ abstract class PbScene
   /**
     シーンの再生時間であれば true を返す。
   */
-  public boolean isPlaytime( int _time )
+  public boolean isPlayTime( int _time )
   {
     return _Tf.isPlayTime( _time );
+  }
+
+  /**
+    シーンでの再生が過ぎていれば true を返す。
+  */
+  public boolean IsPlayOver( int _time )
+  {
+    return ( _Tf.getEndTime() < _time );
   }
 
   /**
@@ -788,19 +842,19 @@ abstract class PbSubScene extends PbScene
   */
   PbSubScene( int _s, int _e, int _div )
   {
-    super( _s, _e );
+    super( _s, _e ); //<>//
 
     _TimeStep = (_e - _s) / _div;
     
     // 分割数分の時間間隔オブジェクトを作る。
-    _TimeFrames = new ArrayList<PbTimeFrame>;
+    _TimeFrames = new ArrayList<PbTimeFrame>();
     
     for( int i = 0; i < _div; ++i )
     {
       int  s = _TimeStep * i;
       int  e = (_TimeStep * (i+1))-1;
       
-      _TimeFrames.add( new PbTimeFrame( s, e ) );
+      _TimeFrames.add( new PbTimeFrame( s, e ) ); //<>//
     }
   }
   
@@ -808,15 +862,19 @@ abstract class PbSubScene extends PbScene
     描画する。
   */
   final void draw()
-  {
+  { //<>//
     // 今の進捗率から、サブ描画の進捗率を得る。
     
-    for( int i = 0; i < _TimeFrames.size(); ++i )
+    for( int i = 0; i < _TimeFrames.size(); ++i ) //<>//
     {
       // 経過率を計算する。
       float  rate = _TimeFrames.get(i).elapsedTimeRate( getCurrnet() );
 
-      if( rate >= 0.0 ) {
+      // 経過に満たないもの、経過を追えたものを除去して計算する。
+      if( 0.0 <= rate && rate <= 1.0 )
+      {
+//      println( "%d:%lf¥n", i, rate );
+        
         drawSub( i, rate );
       }
     }
@@ -836,6 +894,9 @@ class PbScenes extends ArrayList<PbScene>
   boolean  _LoopPlay;
   int      _LoopAdjust;
 
+  // getter/setter
+  void  setLoopAdjust( int _a )  { _LoopAdjust = _a;  }
+
   /**
     コンストラクタ
   */
@@ -848,22 +909,29 @@ class PbScenes extends ArrayList<PbScene>
   /**
     再生するシーンを描画する。
   */
-  void drawScene()
+  void drawScene( int _millis )
   {
-    int play_count = 0;
+    int play_count = 0; //<>//
   
-    int current = millis();
+    int current = _millis;
   
     // 再生時間に達していたら、そのシーンを再生する。
     for( int i = 0; i < size(); ++i )
     {
-      if( get(i).isPlaytime( current - _LoopAdjust ) )
+      if( get(i).isPlayTime( current - _LoopAdjust ) )
       {
         get(i).setCurrent( current - _LoopAdjust );
         get(i).draw();
       
         // 再生シーン数を数える。
         ++play_count;
+      }
+      else if( get(i).isPlayOver( current - _LoopAdjust ) )
+      {
+        get(i).
+        
+        get(i).setCurrent( );
+        get(i).finish();
       }
     }
     
