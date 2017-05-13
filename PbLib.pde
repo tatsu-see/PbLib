@@ -977,6 +977,7 @@ abstract class PbSubScene extends PbScene
     if( i == _TimeFrames.size() )
     {
       drawSub( _TimeFrames.size()-1, 1.0 );
+      _PreDrawIndex = -1;
     }
   }
   
