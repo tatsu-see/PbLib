@@ -732,7 +732,7 @@ class PbTimeFrame
   void setTime( int _s, int _e )
   {
     _StartTime = _s;
-    _EndTime = _e;
+    _EndTime   = _e;
   }
 
   int  getStartTime() { return _StartTime; }
@@ -776,6 +776,14 @@ class PbTimeFrame
   */
   public float elapsedTimeRate( int _time )
   {
+    if( _StartTime == _time ) {
+      return 0.0;
+    }
+    
+    if( _EndTime == _time ) {
+      return 1.0;
+    }
+    
     float all_time  = _EndTime - _StartTime;
     float rest_time = _EndTime - _time;
 
@@ -890,21 +898,31 @@ abstract class PbSubScene extends PbScene
   {
     super( _s, _e );
 
-    _TimeStep = (_e - _s) / _div; //<>//
+    _TimeStep = (_e - _s) / _div;
     
     // 分割数分の時間間隔オブジェクトを作る。
     _TimeFrames = new ArrayList<PbTimeFrame>();
-    
-    for( int i = 0; i < _div; ++i )
-    {
-      int  s = _TimeStep * i;
-      int  e = (_TimeStep * (i+1))-1;
 
-      // 開始時間を考慮してずらす。
-      s += _s;
-      e += _s;
-      
+    // 開始時間を考慮してずらす。
+    int  s = 0 + _s;
+    int  e = s + _TimeStep;
+    
+    for( int i = 0; i < _div; )
+    {
       _TimeFrames.add( new PbTimeFrame( s, e ) );
+      
+      // 直線の最終時間を開始時間として、次の時間区分を設定する。
+      // 直前の終了時間 == 今回の描画開始時間 で設定し、drawSub()
+      // では、進捗割合が 1.0 の場合は、その次の描画まで繰り返す。
+      s = e;
+      e = s + _TimeStep;
+      
+      ++i;
+      
+      // 最後の時間は "指定時間" を設定する。
+      if( i == _div-1 ) {
+        e = _e;
+      }
     }
 
     // 直前に描画したインデックスを初期化する。
@@ -913,17 +931,18 @@ abstract class PbSubScene extends PbScene
   
   /**
     描画する。
-  */ //<>//
+  */
   final void draw()
   {
     // 今の進捗率から、サブ描画の進捗率を得る。
-    int i = 0;
+    int   i = 0;
+    float rate = 0.0;
     
     for( i = 0; i < _TimeFrames.size(); ++i )
     {
       // 経過率を計算する。
-      float  rate = _TimeFrames.get(i).elapsedTimeRate( getCurrnet() );
-
+      rate = _TimeFrames.get(i).elapsedTimeRate( getCurrnet() );
+      
       // 経過に満たないもの、経過を追えたものを除去して計算する。
       if( 0.0 <= rate && rate < 1.0 )
       {
@@ -931,7 +950,7 @@ abstract class PbSubScene extends PbScene
 
         if( i > 0 ) {
           // 2番目以降の描画では、1回だけ1つ前の描画を完了してから描画する。
-          if( _PreDrawIndex != i ) {
+          if( _PreDrawIndex != i && _PreDrawIndex >= 0 ) {
             drawSub( _PreDrawIndex, 1.0 );
           }
         }
@@ -941,10 +960,22 @@ abstract class PbSubScene extends PbScene
         _PreDrawIndex = i;
         break;
       }
+      else if( rate == 1.0 )
+      {
+        // ぴったり最後の描画なので描画したインデックスは忘れてOK。
+        drawSub( i, rate );
+        _PreDrawIndex = -1;
+        
+        // ここでは break しなくて正解。もう一度ループしてみて、次の描画の
+        // 最初の描画を行う。この処理のあとループが終わる場合は、最終要素の
+        // 進捗割合 1.0 の描画が行われる。
+      // break;
+      }
     }
     
     // 1回も描画せずにループを終わったら、最終要素の描画を完了する。
-    if( i == _TimeFrames.size() ) {
+    if( i == _TimeFrames.size() )
+    {
       drawSub( _TimeFrames.size()-1, 1.0 );
     }
   }
@@ -983,12 +1014,14 @@ class PbScenes extends ArrayList<PbScene>
     int play_count = 0;
   
     int current = _millis;
-  
+
     // 再生時間に達していたら、そのシーンを再生する。
     for( int i = 0; i < size(); ++i )
     {
       if( get(i).isPlayTime( current - _LoopAdjust ) )
       {
+        // 描画時間中の場合。
+
         get(i).setCurrent( current - _LoopAdjust );
         get(i).draw();
       
@@ -997,7 +1030,9 @@ class PbScenes extends ArrayList<PbScene>
       }
       else if( get(i).isPlayOver( current - _LoopAdjust ) &&
                !get(i).isFinished() )
-      {        
+      {
+        // 描画時間を過ぎているが、描画が完了していない場合。
+        
         int  end_time = get(i).getTf().getEndTime();
 
         // 進捗を100%にして最後の描画を行う。
