@@ -20,29 +20,28 @@
 /**
   XY点クラス
 */
-class PbPoint {
-
-  float  _X;
-  float  _Y;
-  
+class PbPoint extends PVector
+{  
   // getter/setter
-  float getX() { return _X; }
-  float getY() { return _Y; }
+  float getX() { return x; }
+  float getY() { return y; }
+  float getZ() { return z; }
   
-  void setX( float _x ) { _X = _x; }
-  void setY( float _y ) { _Y = _y; }
-  void setXY( float _x, float _y ) { _X = _x; _Y = _y; }
+  void setX( float _x ) { x = _x; }
+  void setY( float _y ) { y = _y; }
+  void setZ( float _z ) { z = _z; }
+  void setXY( float _x, float _y ) { x = _x; y = _y; }
 
   void setRandom( float _x, float _y )
   {
-    _X = random( _x );
-    _Y = random( _y );
+    setX( random( _x ) );
+    setY( random( _y ) );
   }
 
   void setRandom( float _sx, float _sy, float _ex, float _ey  )
   {
-    _X = random( _sx, _ex );
-    _Y = random( _sy, _ey );
+    setX( random( _sx, _ex ) );
+    setY( random( _sy, _ey ) );
   }
 
   /**
@@ -51,7 +50,7 @@ class PbPoint {
   */
   PbPoint()
   {
-    _X = _Y = 0;
+    x = y = z = 0;
   }
 
   /**
@@ -60,17 +59,22 @@ class PbPoint {
   */
   PbPoint( float _w, float _h )
   {
-    _X = _w;
-    _Y = _h;
+    setX( _w );
+    setY( _h );
   }
 
-  /**
-    コピーコンストラクタ
-  */
+  PbPoint( float _w, float _h, float _z )
+  {
+    setX( _w );
+    setY( _h );
+    setZ( _z );
+  }
+
   PbPoint( PbPoint _pos )
   {
-    _X = _pos.getX();
-    _Y = _pos.getY();
+    setX( _pos.getX() );
+    setY( _pos.getY() );
+    setZ( _pos.getZ() );
   }
 
   /**
@@ -78,7 +82,7 @@ class PbPoint {
   */
   boolean  IsZero()
   {
-    return ( (_X == 0.0) && (_Y == 0.0) );
+    return ( (x == 0.0) && (y == 0.0) );
   }
 
   /**
@@ -99,9 +103,8 @@ class PbPoint {
 
   float  getDist( float _x, float _y )
   {
-    return dist( _x, _y, this.getX(), this.getY() );
+    return dist( new PVector(_x, _y), this );
   }
-
 
   /**
 		位置ベクトルにベクトルを加算する。
@@ -121,14 +124,14 @@ class PbPoint {
 
   PbPoint addX( float _x )
   {
-    _X += _x;
+    x += _x;
 
     return this;
   }
 
   PbPoint addY( float _y )
   {
-    _Y += _y;
+    y += _y;
 
     return this;
   }
@@ -143,8 +146,8 @@ class PbPoint {
 
   PbPoint sub( float _x, float _y )
   {
-    _X -= _x;
-    _Y -= _y;
+    x -= _x;
+    y -= _y;
 
     return this;
   }
@@ -154,8 +157,8 @@ class PbPoint {
   */
   PbPoint mul( float _m )
   {
-    _X *= _m;
-    _Y *= _m;
+    x *= _m;
+    y *= _m;
 
     return this;
   }
@@ -165,8 +168,8 @@ class PbPoint {
   */
   PbPoint div( float _m )
   {
-    _X /= _m;
-    _Y /= _m;
+    x /= _m;
+    y /= _m;
 
     return this;
   }
@@ -196,6 +199,35 @@ class PbPoint {
     float  y = this.getY() - _y;
 
     return new PbPoint( x, y );
+  }
+  
+  /**
+    内分点を得る。
+    参考：http://www.geisya.or.jp/~mwm48961/koukou/bunten02.htm
+  */
+  PbPoint  getInternallyDivP( float m, float n, PbPoint b ) 
+  {
+    PbPoint a = this;
+    
+    float   x = ( n * a.getX() + m * b.getX() ) / ( m + n );
+    float   y = ( n * a.getY() + m * b.getY() ) / ( m + n );
+    float   z = ( n * a.getZ() + m * b.getZ() ) / ( m + n );
+    
+    return new PbPoint( x, y, z );
+  }
+
+  /**
+    外分点を得る。
+    参考：http://www.geisya.or.jp/~mwm48961/koukou/bunten02.htm
+  */
+  PbPoint  getfExternallyDivP( float m, float n, PbPoint b ) 
+  {
+    PbPoint a = this;
+    float   x = ( -n * a.getX() + m * b.getX() ) / m - n;
+    float   y = ( -n * a.getY() + m * b.getY() ) / m - n;
+    float   z = ( -n * a.getZ() + m * b.getZ() ) / m - n;
+    
+    return new PbPoint( x, y, z );
   }
 }
 
@@ -393,21 +425,22 @@ class PbRect
 
   float  getW()
   {
-    return ( _Ep.getX() - _Sp.getX() );
+    return ( _Ep.getX() - _Sp.getX() + 1);
   }
   
   float  getH()
   {
-    return ( _Ep.getY() - _Sp.getY() );
+    return ( _Ep.getY() - _Sp.getY() + 1);
   }
   
   /**
     中心点を取得する。
   */
-  PbPoint  getCenter()
+  PbPoint  getMp()
   {
     float  x = (_Sp.getX() + _Ep.getX() ) / 2.0;
     float  y = (_Sp.getY() + _Ep.getY() ) / 2.0;
+    float  z = (_Sp.getZ() + _Ep.getZ() ) / 2.0;
 
     return new PbPoint( x, y );
   }
@@ -713,13 +746,16 @@ class PbTimeFrame
     _StartTime = _EndTime = 0;
   }
 
-  /**
-    コンストラクタ
-  */
   PbTimeFrame( int _s, int _e )
   {
     _StartTime = _s;
     _EndTime   = _e;
+  }
+
+  PbTimeFrame( PbTimeFrame _tf )
+  {
+    _StartTime = _tf.getStartTime();
+    _EndTime   = _tf.getEndTime();
   }
 
   /**
@@ -728,6 +764,11 @@ class PbTimeFrame
   public boolean isPlayTime( int _time )
   {
     return ( (_StartTime <= _time) && (_time < _EndTime) );
+  }
+
+  public boolean isPlayOver( int _time )
+  {
+    return ( _EndTime <= _time );
   }
 
   /**
@@ -764,12 +805,16 @@ abstract class PbScene
   boolean      _Finished;
 
   // getter/setter
-  int      getLength()  { return _Tf.getLength();  }
+  PbTimeFrame  getTf()      { return new PbTimeFrame( _Tf ); }
+  int          getLength()  { return _Tf.getLength();  }
+
+  int      getStartTime()       { return _Tf.getStartTime();}
+  int      getEndTime()         { return _Tf.getEndTime();  }
   
   int      getCurrnet()         { return _Current; }
   void     setCurrent( int _c ) { _Current = _c;   }
 
-  boolean  getFinished()             { return _Finished; }
+  boolean  isFinished()              { return _Finished; }
   void     setFinished( boolean _b ) { _Finished = _b;   }
   
   /**
@@ -784,7 +829,7 @@ abstract class PbScene
     // 初期化処理
     init();
     
-    // 最後の処理
+    // 最後の描画
     setFinished( false );
   }
 
@@ -809,9 +854,9 @@ abstract class PbScene
   /**
     シーンでの再生が過ぎていれば true を返す。
   */
-  public boolean IsPlayOver( int _time )
+  public boolean isPlayOver( int _time )
   {
-    return ( _Tf.getEndTime() < _time );
+    return _Tf.isPlayOver( _time );
   }
 
   /**
@@ -836,15 +881,16 @@ abstract class PbSubScene extends PbScene
 {
   ArrayList<PbTimeFrame> _TimeFrames;
   int                    _TimeStep;
+  int                    _PreDrawIndex;
   
   /**
     コンストラクタ
   */
   PbSubScene( int _s, int _e, int _div )
   {
-    super( _s, _e ); //<>//
+    super( _s, _e );
 
-    _TimeStep = (_e - _s) / _div;
+    _TimeStep = (_e - _s) / _div; //<>//
     
     // 分割数分の時間間隔オブジェクトを作る。
     _TimeFrames = new ArrayList<PbTimeFrame>();
@@ -853,30 +899,53 @@ abstract class PbSubScene extends PbScene
     {
       int  s = _TimeStep * i;
       int  e = (_TimeStep * (i+1))-1;
+
+      // 開始時間を考慮してずらす。
+      s += _s;
+      e += _s;
       
-      _TimeFrames.add( new PbTimeFrame( s, e ) ); //<>//
+      _TimeFrames.add( new PbTimeFrame( s, e ) );
     }
+
+    // 直前に描画したインデックスを初期化する。
+    _PreDrawIndex = -1;
   }
   
   /**
     描画する。
-  */
+  */ //<>//
   final void draw()
-  { //<>//
+  {
     // 今の進捗率から、サブ描画の進捗率を得る。
+    int i = 0;
     
-    for( int i = 0; i < _TimeFrames.size(); ++i ) //<>//
+    for( i = 0; i < _TimeFrames.size(); ++i )
     {
       // 経過率を計算する。
       float  rate = _TimeFrames.get(i).elapsedTimeRate( getCurrnet() );
 
       // 経過に満たないもの、経過を追えたものを除去して計算する。
-      if( 0.0 <= rate && rate <= 1.0 )
+      if( 0.0 <= rate && rate < 1.0 )
       {
 //      println( "%d:%lf¥n", i, rate );
-        
+
+        if( i > 0 ) {
+          // 2番目以降の描画では、1回だけ1つ前の描画を完了してから描画する。
+          if( _PreDrawIndex != i ) {
+            drawSub( _PreDrawIndex, 1.0 );
+          }
+        }
+
+        // 1回描画して、描画したインデックスを覚えておく。
         drawSub( i, rate );
+        _PreDrawIndex = i;
+        break;
       }
+    }
+    
+    // 1回も描画せずにループを終わったら、最終要素の描画を完了する。
+    if( i == _TimeFrames.size() ) {
+      drawSub( _TimeFrames.size()-1, 1.0 );
     }
   }
   
@@ -911,7 +980,7 @@ class PbScenes extends ArrayList<PbScene>
   */
   void drawScene( int _millis )
   {
-    int play_count = 0; //<>//
+    int play_count = 0;
   
     int current = _millis;
   
@@ -926,12 +995,17 @@ class PbScenes extends ArrayList<PbScene>
         // 再生シーン数を数える。
         ++play_count;
       }
-      else if( get(i).isPlayOver( current - _LoopAdjust ) )
-      {
-        get(i).
-        
-        get(i).setCurrent( );
-        get(i).finish();
+      else if( get(i).isPlayOver( current - _LoopAdjust ) &&
+               !get(i).isFinished() )
+      {        
+        int  end_time = get(i).getTf().getEndTime();
+
+        // 進捗を100%にして最後の描画を行う。
+        get(i).setCurrent( end_time );
+        get(i).draw();
+
+        // 描画完了フラグを立てる。
+        get(i).setFinished( true );
       }
     }
     
@@ -939,6 +1013,11 @@ class PbScenes extends ArrayList<PbScene>
     if( play_count == 0 && _LoopPlay )
     {
       _LoopAdjust = current;
+      
+      // 描画完了フラグを戻す。
+      for( int i = 0; i < size(); ++i ) {
+        get(i).setFinished( false );
+      }
     }
   }
 }
