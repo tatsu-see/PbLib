@@ -3,6 +3,7 @@
   2017/03/26  tatsu.
   
   > PbPoint       XY点のクラス。XYベクトル計算も可。点の色透明度も。
+  > PbMovePoint   XY点が移動するクラス。
   > PbRect        2次元四角形のクラス。点との内外判定も。
   > PbLine        2次元直線のクラス。
   > PbCircle      2次元円のクラス。3点円など。
@@ -329,6 +330,86 @@ class PbMovePoint extends PbPoint
   }
 
 }
+
+/**
+  単位時間あたりの点移動class
+*/
+class PbTimeMovePoint
+{
+  ;
+}
+
+/**
+  単位時間あたりの並行 点移動class
+*/
+class PbTimeMovePoint
+{
+  ;
+}
+
+/**
+  単位時間あたりの回転 点移動class
+*/
+class PbTimeCycleMovePoint extends PbTimeMovePoint
+{
+  int      _Millis;  // ミリ時間
+  float    _Sita;    // ミリ単位時間値の角度変化量
+
+  PbPoint  _Center;  // 回転中心位置
+  float    _RotRad;  // 回転点の半径
+  PbPoint  _RotPos;  // 回転位置
+
+  /**
+    コンストラクタ
+  */
+  PbTimeCycleMovePoint(
+    int    _millis,  // I;初期設定時間
+    float  _rot_deg, // I:単位時間(1ミリ時間)あたりの回転角度
+    float  _cpx,     // I:回転中心
+    float  _cpy,
+    float  _rot_rad  // I:回転半径
+  )
+  {
+    // 初期時間を設定する。
+    _Millis = _millis;
+
+    // 単位時間あたりの角度増加量
+    _Sita = radians( _rot_deg );
+
+    // 回転中心を計算する。
+    _Center = new PbPoint( _cpx, _cpy );
+    
+    // 回転半径
+    _RotRad = _rot_rad;
+    
+    // 回転した点位置
+    _RotPos = new PbPoint();
+  }
+
+  /**
+    経過時間に応じて移動先の点を求める。
+  */
+  void
+  update( int _millis )
+  {
+    // ミリ時間の増分から角度変化量を求める。
+    float  time = (float)( _millis - _Millis );
+
+    float  alpha = _Sita * time;
+    
+    // 初期角度に回転角度を加算した位置を求める。
+    float  x1 = _RotRad;
+    float  y1 = 0.0;
+
+    float  x11 = x1 * cos(alpha) - y1 * sin(alpha);
+    float  y11 = x1 * sin(alpha) + y1 * cos(alpha);
+    
+    // 回転中心分を加算して回転位置を求める。
+    _RotPos.setXY( x11 + _Center.getX(), y11 + _Center.getY() );
+  }
+
+}
+
 
 /**
   四角形クラス
